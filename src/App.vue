@@ -1,10 +1,17 @@
-
 <script setup lang="ts">
-import {onMounted, nextTick, ref} from 'vue';
+import { onMounted, nextTick, ref } from 'vue';
 
 import SyncVideoPlayer from './lib';
 
-const ids = ref( ['video-0', 'video-1', 'video-2']);
+import { createClient } from '@supabase/supabase-js'
+const supabaseUrl = 'https://peqfrnhcsuqybiidcpss.supabase.co'
+const supabase = createClient(supabaseUrl, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlcWZybmhjc3VxeWJpaWRjcHNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTIwOTQzMjcsImV4cCI6MjAyNzY3MDMyN30.F6j2Yf20ZC5Hp1Ug7cSKvbWOuMXS_sQG5KbIw4YnUVo")
+
+const video_url = ref('')
+const video_played = ref(false)
+
+
+const ids = ref(['video-0']);
 
 const syncVideoPlayer = new SyncVideoPlayer({
   controls: false,
@@ -12,23 +19,10 @@ const syncVideoPlayer = new SyncVideoPlayer({
   videoPlayers: [
     {
       id: '#video-0',
-      controls: true,
+      controls: false,
       main: true,
-      initialSrc: 'https://static.videezy.com/system/resources/previews/000/050/817/original/002822-HD-SPECTRUM-COUNTDOWN-01.mp4',
-    },
-    {
-      id: '#video-1',
-      startSeconds: 10,
-      initialSrc: 'https://static.videezy.com/system/resources/previews/000/051/313/original/002823-HD-SPECTRUM-COUNTDOWN-02.mp4',
-    },
-    {
-      id: '#video-2',
-      initialSrc: 'https://static.videezy.com/system/resources/previews/000/049/943/original/002831-HD-COUNTDOWN-03.mp4',
-    },
-    {
-      id: '#video-3',
-      initialSrc: 'https://static.videezy.com/system/resources/previews/000/004/294/original/18_20Dragon_20Coaster_20Part_202.mp4',
-    },
+      initialSrc: "https://peqfrnhcsuqybiidcpss.supabase.co/storage/v1/object/public/myfiles/12w12w1.mp4?t=2024-04-06T18%3A29%3A36.630Z",
+    }
   ],
 });
 
@@ -37,25 +31,41 @@ onMounted(() => {
 });
 
 async function onPlay() {
-  await syncVideoPlayer.play();
+
+
+  const { data, error } = await supabase
+    .from('video_sync')
+    .update({ played: true })
+    .eq('id', '1')
+    .select()
+
 }
 
 async function onPause() {
-  await syncVideoPlayer.pause();
+
+
+  const { data, error } = await supabase
+    .from('video_sync')
+    .update({ played: false })
+    .eq('id', '1')
+    .select()
+
 }
 
-function onAdd() {
-  // create area for video1
-  const id = `video-${Math.random().toString(36).substring(2, 9)}`;
-  ids.value.push(id);
-  nextTick(() => {
-    // add video
-    syncVideoPlayer.addVideoPlayer({
-      id: `#${id}`,
-      initialSrc: 'https://static.videezy.com/system/resources/previews/000/004/294/original/18_20Dragon_20Coaster_20Part_202.mp4',
-    });
-  });
-}
+const channels = supabase.channel('custom-update-channel')
+  .on(
+    'postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'video_sync' },
+    async (payload) => {
+      if (payload.new.played) {
+        await syncVideoPlayer.play();
+      }
+      else {
+        await syncVideoPlayer.pause();
+      }
+    }
+  )
+  .subscribe()
 
 async function onClick(index: number) {
   syncVideoPlayer.swapVideo(0, index);
@@ -70,18 +80,12 @@ async function onChange(e: Event) {
 <template>
   <div>
     <div class="container">
-      <div v-for="(id, i) in ids"
-           class="box"
-           :id="id"
-            :key="i"
-           @click="onClick(i)">B</div>
+      <div v-for="(id, i) in ids" class="box" :id="id" :key="i" @click="onClick(i)">B</div>
     </div>
 
     <div class="controls">
-      <button @click="onAdd" >Add video</button>
-      <button @click="onPlay" >Play</button>
+      <button @click="onPlay">Play</button>
       <button @click="onPause">Pause</button>
-      <!-- range selector for time -->
       <div class="time">
         <input type="range" min="0" max="100" value="0" class="slider" id="myRange" @input="onChange">
       </div>
@@ -92,22 +96,13 @@ async function onChange(e: Event) {
 
 
 <style scoped lang="scss">
-
- .container {
-   display: grid;
-   grid-template-columns: 1fr 1fr;
-   grid-column-gap: 16px;
-   grid-row-gap: 16px;
- }
-
 .box {
-  min-width: 180px;
-  height: 200px;
+  min-width: 100%;
+  height: 100%;
   padding: 8px;
   font-weight: bold;
   font-size: 17px;
   line-height: 24px;
-  border: 1px solid #589BFF;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -116,18 +111,25 @@ async function onChange(e: Event) {
 
 .qqq {
   grid-area: aaa;
-};
+}
+
+;
 
 .www {
   grid-area: bbb;
-};
+}
+
+;
 
 .eee {
   grid-area: ccc;
-};
+}
+
+;
 
 .rrr {
   grid-area: ddd;
-};
+}
 
+;
 </style>
